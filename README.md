@@ -34,7 +34,8 @@ All of this is tunable in **Settings**.
 
 | Page | What it's for |
 |---|---|
-| Lab | home dashboard: today's DSA set, books in progress (update your page inline), active projects with their next task |
+| Lab | home dashboard: what's on now and next, your priorities, today's DSA set, books in progress (update your page inline), active projects with their next task |
+| Schedule | your routine as recurring time blocks per weekday (Day timeline with a "now" line, Week grid), one-off events, skip or move a single day without touching the routine, built-in phase timers (e.g. 5 → 20 → 5 min) that keep running across pages and reloads, optional start-of-block reminders, and your current priorities |
 | Today | daily DSA set, rerolls, streak, quick stats |
 | Progress | skill per category, activity heatmap, review forecast, pattern-recognition accuracy |
 | Library | search/filter all problems, add any problem to today, exclude or retire problems |
@@ -47,6 +48,12 @@ All of this is tunable in **Settings**.
 ### Importing LeetCode history
 
 Settings → *Accounts & past solves*. LeetCode only exposes your last ~20 solves publicly. For the full history, paste your own `LEETCODE_SESSION` cookie (it stays in the local DB and is only sent to leetcode.com). You can also paste links/ids of solved problems from any judge.
+
+### Google Calendar sync
+
+Settings → *Google Calendar* mirrors your Schedule into a dedicated "Study Lab" calendar in your Google account, so your phone gets the reminders. The sync is one-way: edits, skips, moves and one-off events push automatically a few seconds after you make them, and Study Lab overwrites any changes made in Google.
+
+It needs a one-time setup: your own free Google OAuth client. The Settings card walks you through it and shows the exact redirect URIs to register. The app only requests the `calendar.app.created` scope, so it can only see and change the calendar it creates. The client secret and sign-in token are stored in the local database in `data/`, which is never committed.
 
 ## Development
 

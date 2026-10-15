@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { api, type Project, type Stats, type Today } from '../api'
+import { api, type Occurrence, type Project, type Settings, type Stats, type Today } from '../api'
 import { Bar, PageInput, useBooks, useLabMutation, useProjects } from '../components/lab'
+import { BlockLink, CategoryChip, fmtRange, fmtTime, localDate, nowAndNext, nowMin, parseDay, toMin, useNow, useScheduleDays } from '../components/schedule'
+import { useTimer } from '../components/timer'
 import { ErrorBox, PageHeader, SourceBadge, Stat } from '../components/ui'
 
 export default function Lab() {
@@ -21,6 +23,11 @@ export default function Lab() {
     <div>
       <PageHeader title="Study Lab" subtitle={dateLabel} />
       <ErrorBox error={today.error || books.error || projects.error} />
+
+      <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <NowNext />
+        <FocusCard />
+      </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="DSA today" value={t ? `${t.completed}/${t.total}` : '—'} sub={t && t.reviews_due ? `${t.reviews_due} reviews due` : 'problems done'} />
@@ -177,5 +184,116 @@ function ProjectRow({ project: p }: { project: Project }) {
         <div className="mt-1 text-xs text-muted">{p.tasks_total ? 'All tasks done' : 'No tasks yet'}</div>
       )}
     </li>
+  )
+}
+
+function NowNext() {
+  const now = useNow()
+  const sched = useScheduleDays(localDate(now), 2)
+  const items = sched.data?.[0]?.items ?? []
+  const { current, next } = nowAndNext(items, now)
+  const tomorrow = next ? null : (sched.data?.[1]?.items ?? []).find((i) => !i.skipped)
+  const n = nowMin(now)
+
+  return (
+    <section className="card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Now</h2>
+        <Link to="/schedule" className="text-xs text-muted hover:text-accent">
+          Full day →
+        </Link>
+      </div>
+      {sched.isLoading ? null : items.length === 0 && !tomorrow ? (
+        <Empty>
+          No schedule yet. <Link to="/schedule?view=routine" className="text-accent underline">Set up your routine</Link>
+        </Empty>
+      ) : (
+        <div className="space-y-3">
+          {current ? (
+            <BlockNow item={current} minutesLeft={Math.ceil(toMin(current.end_time!) - n)} progress={(n - toMin(current.start_time)) / (toMin(current.end_time!) - toMin(current.start_time))} />
+          ) : (
+            <div className="text-sm text-muted">Nothing scheduled right now.</div>
+          )}
+          {next && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3 text-sm">
+              <span className="text-xs font-semibold tracking-wide text-muted uppercase">Next</span>
+              <span className="tabular-nums">{fmtTime(next.start_time)}</span>
+              <span className="font-medium">{next.title}</span>
+              <span className="text-xs text-muted">in {fmtIn(toMin(next.start_time) - n)}</span>
+            </div>
+          )}
+          {tomorrow && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3 text-sm">
+              <span className="text-xs font-semibold tracking-wide text-muted uppercase">Tomorrow</span>
+              <span className="tabular-nums">{fmtTime(tomorrow.start_time)}</span>
+              <span className="font-medium">{tomorrow.title}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function fmtIn(min: number) {
+  const m = Math.max(1, Math.round(min))
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60 ? `${m % 60}m` : ''}`.trim()
+}
+
+function BlockNow({ item, minutesLeft, progress }: { item: Occurrence; minutesLeft: number; progress: number }) {
+  const timer = useTimer()
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-lg font-semibold">{item.title}</span>
+        <CategoryChip category={item.category} />
+      </div>
+      <div className="mt-0.5 text-xs text-muted">
+        {fmtRange(item)} · {minutesLeft} min left
+      </div>
+      {item.notes && <p className="mt-1 line-clamp-2 text-sm text-muted">{item.notes}</p>}
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-panel-2">
+        <div className="h-full bg-accent" style={{ width: `${Math.min(100, progress * 100)}%` }} />
+      </div>
+      {(item.timer || item.link) && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {item.timer && (
+            <button className="btn btn-primary" onClick={() => timer.start({ name: item.timer!.name, phases: item.timer!.phases, loop: item.timer!.loop, context: `${item.title} · ${fmtRange(item)}` })}>
+              ▶ {item.timer.name} timer
+            </button>
+          )}
+          {item.link && <BlockLink href={item.link} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FocusCard() {
+  const settings = useQuery({ queryKey: ['settings'], queryFn: () => api.get<Settings>('/api/settings') })
+  const focus = settings.data?.lab_focus
+  if (!focus) return <section className="card p-4" />
+  const daysLeft = focus.until ? Math.ceil((parseDay(focus.until).getTime() - parseDay(localDate()).getTime()) / 86400000) : null
+  return (
+    <section className="card p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">
+          Priorities
+          {daysLeft !== null && <span className="font-normal text-muted"> · {daysLeft >= 0 ? `${daysLeft} days left` : 'period ended'}</span>}
+        </h2>
+        <Link to="/schedule?view=routine" className="text-xs text-muted hover:text-accent">
+          Edit →
+        </Link>
+      </div>
+      {focus.items.length ? (
+        <ol className="list-decimal space-y-1 pl-5 text-sm">
+          {focus.items.map((x, i) => (
+            <li key={i}>{x}</li>
+          ))}
+        </ol>
+      ) : (
+        <Empty>No priorities set.</Empty>
+      )}
+    </section>
   )
 }

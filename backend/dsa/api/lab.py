@@ -67,6 +67,7 @@ def book_out(b: Book) -> dict:
         "status": b.status,
         "total_pages": b.total_pages,
         "current_page": b.current_page,
+        "page_updated_at": b.page_updated_at.isoformat() if b.page_updated_at else None,
         "percent": 100 if b.status == "finished" else pct,
         "started_on": b.started_on,
         "finished_on": b.finished_on,
@@ -88,11 +89,22 @@ def _set_book_status(session: Session, b: Book, new: str) -> None:
     elif new == "finished":
         b.started_on = b.started_on or today
         b.finished_on = today
-        if b.total_pages:
+        if b.total_pages and b.current_page != b.total_pages:
             b.current_page = b.total_pages
+            b.page_updated_at = utcnow()
     elif new == "queued":
+        # Re-queuing wipes the dates, so keep a record of the earlier read as a note.
+        if b.status in ("finished", "dropped") and b.started_on:
+            if b.status == "finished":
+                line = f"Finished on {b.finished_on or today} (started {b.started_on})"
+                if b.rating:
+                    line += f", rated {b.rating}/5"
+            else:
+                line = f"Dropped at page {b.current_page} (started {b.started_on})"
+            b.notes.append(BookNote(body=line + ". Moved back to the queue.", page=b.current_page or None))
         b.started_on = b.finished_on = None
         b.current_page = 0
+        b.page_updated_at = None
         b.position = _next_position(session, Book, Book.status == "queued")
     elif new == "dropped":
         b.finished_on = None
@@ -150,10 +162,13 @@ def update_book(book_id: int, body: BookPatch, session: Session = Depends(get_se
     # Status first so explicitly sent dates/pages win over the transition defaults.
     if "status" in changes:
         _set_book_status(session, b, changes.pop("status"))
+    page_before = b.current_page
     for k, v in changes.items():
         setattr(b, k, v)
     if b.total_pages and b.current_page > b.total_pages:
         b.current_page = b.total_pages
+    if b.current_page != page_before:
+        b.page_updated_at = utcnow()
     b.updated_at = utcnow()
     session.commit()
     return book_out(b)

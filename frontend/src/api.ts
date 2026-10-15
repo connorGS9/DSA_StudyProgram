@@ -146,6 +146,7 @@ export interface Stats {
 
 export interface Settings {
   daily_count: number
+  lab_focus: LabFocus
   review_share: number
   history_review_share: number
   source_weights: Record<Source, number>
@@ -244,6 +245,7 @@ export interface Book {
   status: BookStatus
   total_pages: number | null
   current_page: number
+  page_updated_at: string | null
   percent: number | null
   started_on: string | null
   finished_on: string | null
@@ -279,4 +281,52 @@ export interface Project {
   next_task: string | null
   tasks: ProjectTask[]
   notes: LabNote[]
+}
+
+// --- Schedule ----------------------------------------------------------------------------------
+
+export interface TimerPhase {
+  label: string
+  minutes: number
+}
+
+export interface TimerPreset {
+  id: number
+  name: string
+  phases: TimerPhase[]
+  loop: boolean
+  total_minutes: number
+}
+
+export type BlockCategory = 'routine' | 'work' | 'meeting' | 'study' | 'health' | 'free'
+
+export interface ScheduleBlock {
+  id: number
+  title: string
+  start_time: string
+  end_time: string | null
+  days: number[]
+  date: string | null
+  category: BlockCategory
+  timer: TimerPreset | null
+  timer_id: number | null
+  link: string
+  notes: string
+  optional: boolean
+  moved_from_id: number | null
+}
+
+export interface Occurrence extends ScheduleBlock {
+  skipped: boolean
+}
+
+export interface ScheduleDay {
+  date: string
+  weekday: number
+  items: Occurrence[]
+}
+
+export interface LabFocus {
+  items: string[]
+  until: string | null
 }

@@ -208,6 +208,7 @@ class Book(Base):
     status: Mapped[str] = mapped_column(String(10), default="queued", index=True)  # queued | reading | finished | dropped
     total_pages: Mapped[int | None] = mapped_column(Integer, nullable=True)
     current_page: Mapped[int] = mapped_column(Integer, default=0)
+    page_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # last time current_page changed
     started_on: Mapped[str | None] = mapped_column(String(10), nullable=True)  # local date, ISO
     finished_on: Mapped[str | None] = mapped_column(String(10), nullable=True)
     rating: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 1..5
@@ -278,3 +279,66 @@ class ProjectNote(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     project: Mapped[Project] = relationship(back_populates="notes")
+
+
+# --- Study lab: schedule ----------------------------------------------------------------------
+
+class TimerPreset(Base):
+    """A named sequence of timed phases, e.g. 25 min reading → 5 min break → 25 min applying."""
+
+    __tablename__ = "timer_presets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    phases: Mapped[list] = mapped_column(JSON, default=list)  # [{"label": str, "minutes": int}]
+    loop: Mapped[bool] = mapped_column(Boolean, default=False)  # repeat until stopped (work sprints)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ScheduleBlock(Base):
+    """A time block: recurring on `days`, or a one-off on `date`. Times are local "HH:MM"."""
+
+    __tablename__ = "schedule_blocks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(256))
+    start_time: Mapped[str] = mapped_column(String(5))
+    end_time: Mapped[str | None] = mapped_column(String(5), nullable=True)  # null = a point in time (bedtime)
+    days: Mapped[list] = mapped_column(JSON, default=list)  # weekdays, 0 = Monday
+    date: Mapped[str | None] = mapped_column(String(10), nullable=True, index=True)  # one-off on this local date
+    # routine | work | meeting | study | health | free
+    category: Mapped[str] = mapped_column(String(16), default="routine")
+    timer_id: Mapped[int | None] = mapped_column(ForeignKey("timer_presets.id", ondelete="SET NULL"), nullable=True)
+    link: Mapped[str] = mapped_column(String(512), default="")  # in-app route ("/dsa") or URL
+    notes: Mapped[str] = mapped_column(Text, default="")
+    optional: Mapped[bool] = mapped_column(Boolean, default=False)
+    # One-off created by moving a recurring block for a day.
+    moved_from_id: Mapped[int | None] = mapped_column(ForeignKey("schedule_blocks.id", ondelete="SET NULL"), nullable=True)
+    moved_from_date: Mapped[str | None] = mapped_column(String(10), nullable=True)  # the occurrence it replaces
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    timer: Mapped[TimerPreset | None] = relationship()
+    skips: Mapped[list[ScheduleSkip]] = relationship(back_populates="block", cascade="all, delete-orphan")
+
+
+class ScheduleSkip(Base):
+    """A recurring block that doesn't happen on one date."""
+
+    __tablename__ = "schedule_skips"
+
+    block_id: Mapped[int] = mapped_column(ForeignKey("schedule_blocks.id", ondelete="CASCADE"), primary_key=True)
+    date: Mapped[str] = mapped_column(String(10), primary_key=True)
+
+    block: Mapped[ScheduleBlock] = relationship(back_populates="skips")
+
+
+class GcalEvent(Base):
+    """Google Calendar event mirroring a schedule block. No FK: the row must outlive a deleted
+    block so the remote event can be deleted on the next sync."""
+
+    __tablename__ = "gcal_events"
+
+    block_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(1024))
+    body_hash: Mapped[str] = mapped_column(String(64))
+    synced_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

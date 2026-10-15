@@ -1,4 +1,6 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
+import { useBlockReminders } from './components/schedule'
+import { FloatingTimer } from './components/timer'
 import Books from './pages/Books'
 import CheatSheet from './pages/CheatSheet'
 import Lab from './pages/Lab'
@@ -6,6 +8,7 @@ import Library from './pages/Library'
 import ProblemPage from './pages/ProblemPage'
 import Projects from './pages/Projects'
 import Progress from './pages/Progress'
+import Schedule from './pages/Schedule'
 import SettingsPage from './pages/SettingsPage'
 import Solve from './pages/Solve'
 import Today from './pages/Today'
@@ -13,7 +16,10 @@ import Videos from './pages/Videos'
 
 const NAV: { section?: string; items: { to: string; label: string; icon: string }[] }[] = [
   {
-    items: [{ to: '/', label: 'Lab', icon: 'M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z' }],
+    items: [
+      { to: '/', label: 'Lab', icon: 'M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z' },
+      { to: '/schedule', label: 'Schedule', icon: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M8 14h3' },
+    ],
   },
   {
     section: 'DSA',
@@ -46,6 +52,7 @@ function Icon({ d }: { d: string }) {
 }
 
 export default function App() {
+  useBlockReminders()
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="border-b border-line bg-panel md:sticky md:top-0 md:h-screen md:w-56 md:shrink-0 md:border-r md:border-b-0">
@@ -81,6 +88,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Lab />} />
             <Route path="/dsa" element={<Today />} />
+            <Route path="/schedule" element={<Schedule />} />
             <Route path="/books" element={<Books />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/solve/:slotId" element={<Solve />} />
@@ -94,6 +102,7 @@ export default function App() {
           </Routes>
         </div>
       </main>
+      <FloatingTimer />
     </div>
   )
 }

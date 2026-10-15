@@ -75,3 +75,48 @@ def test_project_tasks_drive_progress(client):
     idea = client.post("/api/projects", json={"name": "Later", "status": "idea"}).json()
     assert idea["started_on"] is None
     assert [x["name"] for x in client.get("/api/projects").json()] == ["Later", "Study Lab"]  # idea before done
+
+
+def test_several_books_reading_and_page_bookmark(client):
+    ids = [client.post("/api/books", json={"title": f"B{i}", "total_pages": 200, "status": "reading"}).json()["id"] for i in range(4)]
+    assert sum(b["status"] == "reading" for b in client.get("/api/books").json()) == 4
+
+    b = client.get("/api/books").json()[0]
+    assert b["page_updated_at"] is None
+    r = client.patch(f"/api/books/{ids[0]}", json={"current_page": 57}).json()
+    assert r["current_page"] == 57 and r["page_updated_at"]
+    stamp = r["page_updated_at"]
+    # Editing other fields doesn't move the bookmark time.
+    assert client.patch(f"/api/books/{ids[0]}", json={"author": "x"}).json()["page_updated_at"] == stamp
+    assert next(b for b in client.get("/api/books").json() if b["id"] == ids[0])["current_page"] == 57
+
+
+def test_migration_adds_page_column_to_old_db(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE books (id INTEGER PRIMARY KEY, title VARCHAR(256), author VARCHAR(256), status VARCHAR(10), "
+                "total_pages INTEGER, current_page INTEGER, started_on VARCHAR(10), finished_on VARCHAR(10), rating INTEGER, "
+                "url VARCHAR(512), position INTEGER, created_at DATETIME, updated_at DATETIME)")
+    con.execute("INSERT INTO books VALUES (1, 'Old', '', 'reading', 100, 12, NULL, NULL, NULL, '', 1, '2026-01-01', '2026-01-01')")
+    con.commit()
+    con.close()
+    app = create_app(db_url=f"sqlite:///{path}", auto_import=False)
+    with TestClient(app) as c:
+        b = c.get("/api/books").json()[0]
+        assert b["current_page"] == 12 and b["page_updated_at"] is None
+        assert c.patch("/api/books/1", json={"current_page": 20}).json()["page_updated_at"]
+
+
+def test_finished_book_back_to_queue_keeps_history(client):
+    a = client.post("/api/books", json={"title": "A"}).json()
+    b = client.post("/api/books", json={"title": "B", "total_pages": 100, "status": "reading"}).json()
+    client.patch(f"/api/books/{b['id']}", json={"status": "finished", "rating": 4})
+
+    r = client.patch(f"/api/books/{b['id']}", json={"status": "queued"}).json()
+    assert r["status"] == "queued" and r["finished_on"] is None and r["current_page"] == 0
+    assert r["rating"] == 4
+    assert "Finished on" in r["notes"][0]["body"] and "rated 4/5" in r["notes"][0]["body"]
+    queue = [x["title"] for x in client.get("/api/books").json() if x["status"] == "queued"]
+    assert queue == ["A", "B"]  # appended to the end

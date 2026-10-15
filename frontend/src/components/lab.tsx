@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type DragEvent, type ReactNode, useState } from 'react'
+import { type DragEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { api, type Book, type BookStatus, type LabNote, type Project, type ProjectStatus } from '../api'
 import { fmtDate } from './ui'
 
@@ -40,6 +40,17 @@ export function useLabMutation(key: 'books' | 'projects') {
 export function fmtDay(day: string | null | undefined) {
   if (!day) return '—'
   return new Date(day + 'T00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+/** "today at 9:40 PM", "yesterday at 8:05 AM", "Mon at …", or a date, by local calendar day. */
+export function fmtWhen(iso: string) {
+  const d = new Date(iso.endsWith('Z') || iso.includes('+') ? iso : iso + 'Z')
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000)
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  if (days === 0) return `today at ${time}`
+  if (days === 1) return `yesterday at ${time}`
+  if (days < 7) return `${d.toLocaleDateString(undefined, { weekday: 'long' })} at ${time}`
+  return fmtDate(iso)
 }
 
 export function Bar({ percent, tone = 'accent' }: { percent: number | null; tone?: 'accent' | 'good' }) {
@@ -161,15 +172,58 @@ export function useDragOrder<T extends { id: number }>(items: T[], commit: (ids:
   return { list, rowProps }
 }
 
+/**
+ * Current-page box. Saves shortly after typing stops, on blur/Enter, and when the tab is hidden,
+ * closed or the component unmounts, so a typed page is never lost.
+ */
 export function PageInput({ book }: { book: Book }) {
-  const m = useLabMutation('books')
+  const qc = useQueryClient()
   const [val, setVal] = useState<string | null>(null)
-  const save = () => {
-    if (val === null) return
-    const n = Math.max(0, Number(val) || 0)
-    if (n !== book.current_page) m.mutate({ method: 'patch', url: `/api/books/${book.id}`, body: { current_page: n } })
-    setVal(null)
+  const pending = useRef<number | null>(null)
+  const saved = useRef(book.current_page)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => {
+    saved.current = book.current_page
+  }, [book.current_page])
+
+  const flush = useCallback(() => {
+    clearTimeout(timer.current)
+    const n = pending.current
+    pending.current = null
+    if (n === null || n === saved.current) return
+    saved.current = n
+    qc.setQueryData<Book[]>(['books'], (cur) =>
+      cur?.map((b) => (b.id === book.id ? { ...b, current_page: n, percent: b.total_pages ? Math.round((100 * Math.min(n, b.total_pages)) / b.total_pages) : null } : b)),
+    )
+    // keepalive lets the request finish even if the tab is closing.
+    fetch(`/api/books/${book.id}`, {
+      method: 'PATCH',
+      keepalive: true,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_page: n }),
+    }).finally(() => qc.invalidateQueries({ queryKey: ['books'] }))
+  }, [book.id, qc])
+
+  useEffect(() => {
+    const onHide = () => document.visibilityState === 'hidden' && flush()
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onHide)
+      flush()
+    }
+  }, [flush])
+
+  const onChange = (raw: string) => {
+    setVal(raw)
+    clearTimeout(timer.current)
+    if (raw.trim() === '') return // mid-edit; don't save 0
+    const n = Math.max(0, Math.floor(Number(raw)) || 0)
+    pending.current = book.total_pages ? Math.min(n, book.total_pages) : n
+    timer.current = setTimeout(flush, 600)
   }
+
   return (
     <span className="inline-flex items-center gap-1 text-xs text-muted">
       p.
@@ -178,9 +232,13 @@ export function PageInput({ book }: { book: Book }) {
         type="number"
         min={0}
         max={book.total_pages ?? undefined}
+        aria-label={`Current page of ${book.title}`}
         value={val ?? book.current_page}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={save}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => {
+          flush()
+          setVal(null)
+        }}
         onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
       />
       {book.total_pages ? <>/ {book.total_pages}</> : null}

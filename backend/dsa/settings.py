@@ -30,6 +30,8 @@ DEFAULTS: dict[str, Any] = {
     "leetcode_session": "",  # secret; only ever sent to leetcode.com
     # FSRS target probability of still being able to solve a problem when it comes due.
     "desired_retention": 0.85,
+    # Study lab: current priorities shown on the dashboard, e.g. for "the next four weeks".
+    "lab_focus": {"items": [], "until": None},
 }
 
 SECRET_KEYS = {"leetcode_session"}
@@ -43,7 +45,9 @@ def get(session: Session, key: str) -> Any:
 def get_all(session: Session) -> dict[str, Any]:
     values = dict(DEFAULTS)
     for row in session.query(Setting):
-        values[row.key] = row.value
+        # Other modules keep private state in this table (e.g. "gcal.token"); never expose it here.
+        if row.key in DEFAULTS:
+            values[row.key] = row.value
     return values
 
 
