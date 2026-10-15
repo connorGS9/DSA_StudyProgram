@@ -64,6 +64,25 @@ def is_connected(session: Session) -> bool:
     return bool(get(session, "token"))
 
 
+API_DISABLED_HELP = (
+    "The Google Calendar API is turned off in your Google Cloud project. Enable it at "
+    "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com (check the Study Lab "
+    "project is selected at the top), wait a minute, then click Sync now."
+)
+
+
+def google_error(r: httpx.Response, what: str) -> str:
+    """Readable message from a Google error response."""
+    try:
+        err = r.json().get("error", {})
+        msg = err.get("message", "") if isinstance(err, dict) else str(err)
+    except ValueError:
+        msg = r.text[:200]
+    if r.status_code == 403 and ("SERVICE_DISABLED" in r.text or "accessNotConfigured" in r.text or "has not been used" in msg):
+        return API_DISABLED_HELP
+    return f"{what} ({r.status_code}): {msg.split('. ')[0] if msg else 'no details'}"
+
+
 # --- OAuth ------------------------------------------------------------------------------------
 
 def new_http() -> httpx.Client:
@@ -85,7 +104,7 @@ def exchange_code(session: Session, http: httpx.Client, code: str, redirect_uri:
         "redirect_uri": redirect_uri, "grant_type": "authorization_code",
     })
     if r.status_code != 200:
-        raise GcalError(f"Google rejected the sign-in ({r.status_code}): {r.text[:200]}")
+        raise GcalError(google_error(r, f"Google rejected the sign-in"))
     data = r.json()
     if not data.get("refresh_token"):
         raise GcalError("Google did not return a refresh token; disconnect and connect again.")
@@ -178,14 +197,14 @@ def _ensure_calendar(g: Google, session: Session, tz: str) -> str:
         if r.status_code == 200:
             return cal_id
         if r.status_code not in (404, 410):
-            raise GcalError(f"Couldn't open the Study Lab calendar ({r.status_code}): {r.text[:200]}")
+            raise GcalError(google_error(r, f"Couldn't open the Study Lab calendar"))
     # First connect, or the user deleted the calendar in Google: (re)create it.
     r = g.request("POST", "/calendars", json={
         "summary": CALENDAR_NAME, "timeZone": tz,
         "description": "Your Study Lab routine. Managed by the Study Lab app; edit blocks there.",
     })
     if r.status_code != 200:
-        raise GcalError(f"Couldn't create the Study Lab calendar ({r.status_code}): {r.text[:200]}")
+        raise GcalError(google_error(r, f"Couldn't create the Study Lab calendar"))
     cal_id = r.json()["id"]
     put(session, "calendar_id", cal_id)
     for m in session.scalars(select(GcalEvent)):
@@ -231,7 +250,7 @@ def sync(session: Session, http: httpx.Client | None = None) -> dict:
                 else:
                     counts["updated"] += 1
                 if r.status_code != 200:
-                    raise GcalError(f"Couldn't save '{b.title}' ({r.status_code}): {r.text[:200]}")
+                    raise GcalError(google_error(r, f"Couldn't save '{b.title}'"))
                 if m is None:
                     m = GcalEvent(block_id=b.id, event_id="", body_hash="")
                     session.add(m)
@@ -244,7 +263,7 @@ def sync(session: Session, http: httpx.Client | None = None) -> dict:
                     continue
                 r = g.request("DELETE", f"/calendars/{cal}/events/{m.event_id}")
                 if r.status_code not in (200, 204, 404, 410):
-                    raise GcalError(f"Couldn't delete an event ({r.status_code}): {r.text[:200]}")
+                    raise GcalError(google_error(r, f"Couldn't delete an event"))
                 session.delete(m)
                 counts["deleted"] += 1
                 session.commit()

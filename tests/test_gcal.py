@@ -212,3 +212,21 @@ def test_disconnect_can_delete_calendar(client, google):
     assert st["connected"] is False and st["calendar_id"] is None and st["events"] == 0
     assert google.calendars == {} and google.revoked == ["r1"]
     assert st["configured"] is True  # client credentials kept for reconnecting
+
+
+def test_disabled_api_gives_actionable_error(client, google, monkeypatch):
+    disabled = httpx.Response(403, json={"error": {"code": 403, "message": "Google Calendar API has not been used in project 1 before or it is disabled. Enable it by visiting https://console.developers.google.com/...", "errors": [{"reason": "accessNotConfigured"}]}})
+    real = google.handle
+    monkeypatch.setattr(google, "handle", lambda req: disabled if req.url.host == "www.googleapis.com" else real(req))
+    client.post("/api/schedule/blocks", json={"title": "Scrum", "start_time": "08:15", "end_time": "08:35", "days": [0]})
+    client.put("/api/gcal/config", json={"client_id": "cid", "client_secret": "csecret"})
+    connect_url = client.get("/api/gcal/connect", params={"tz": "UTC"}).json()["url"]
+    state = parse_qs(urlparse(connect_url).query)["state"][0]
+    r = client.get("/api/gcal/callback", params={"code": "good", "state": state}, follow_redirects=False)
+    st = client.get("/api/gcal/status").json()
+    assert st["connected"] is True  # sign-in kept; only the API call failed
+    assert st["last_error"] == gcal.API_DISABLED_HELP and "gcal=error" in r.headers["location"]
+
+    monkeypatch.setattr(google, "handle", real)  # user enables the API
+    assert client.post("/api/gcal/sync").status_code == 200
+    assert client.get("/api/gcal/status").json()["last_error"] is None

@@ -63,7 +63,7 @@ export default function GoogleCalendarCard() {
           Connected. Your routine is now in the “Study Lab” calendar.
         </Banner>
       )}
-      {flash === 'error' && (
+      {flash === 'error' && !(s?.connected && s.last_error) && (
         <Banner tone="bad" onClose={dismiss}>
           {params.get('msg') || 'Connecting failed.'}
         </Banner>
@@ -95,10 +95,22 @@ export default function GoogleCalendarCard() {
   )
 }
 
+function linkify(text: string) {
+  return text.split(/(https:\/\/\S+)/).map((part, i) =>
+    part.startsWith('https://') ? (
+      <a key={i} href={part} target="_blank" rel="noreferrer" className="font-medium underline">
+        {part.replace(/^https:\/\//, '').split('/')[0]}
+      </a>
+    ) : (
+      part
+    ),
+  )
+}
+
 function Banner({ tone, children, onClose }: { tone: 'good' | 'bad'; children: ReactNode; onClose?: () => void }) {
   return (
     <div className={`mb-3 flex items-start justify-between gap-3 rounded-lg px-3 py-2 text-sm ${tone === 'good' ? 'bg-good-soft text-good' : 'bg-bad-soft text-bad'}`}>
-      <span>{children}</span>
+      <span className="min-w-0 break-words">{typeof children === 'string' ? linkify(children) : children}</span>
       {onClose && (
         <button onClick={onClose} aria-label="Dismiss">
           ✕
@@ -112,7 +124,7 @@ function Connected({ status: s, update, pending }: { status: GcalStatus; update:
   const [deleteCal, setDeleteCal] = useState(false)
   return (
     <div className="space-y-4">
-      {s.last_error && <Banner tone="bad">Last sync failed: {s.last_error}</Banner>}
+      {s.last_error && <Banner tone="bad">{s.last_error}</Banner>}
       <div className="grid gap-3 text-sm sm:grid-cols-3">
         <div>
           <div className="label">Last synced</div>
