@@ -44,7 +44,8 @@ export function fmtDay(day: string | null | undefined) {
 
 /** "today at 9:40 PM", "yesterday at 8:05 AM", "Mon at …", or a date, by local calendar day. */
 export function fmtWhen(iso: string) {
-  const d = new Date(iso.endsWith('Z') || iso.includes('+') ? iso : iso + 'Z')
+  // Naive timestamps from the API are UTC; ones with an offset are used as-is.
+  const d = new Date(/([zZ]|[+-]\d\d:?\d\d)$/.test(iso) ? iso : iso + 'Z')
   const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000)
   const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   if (days === 0) return `today at ${time}`

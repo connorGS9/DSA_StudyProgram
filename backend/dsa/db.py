@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
@@ -50,6 +51,20 @@ def init_db(url: str | None = None) -> Engine:
     _add_missing_columns(_engine)
     _SessionLocal = sessionmaker(bind=_engine, expire_on_commit=False)
     return _engine
+
+
+def db_path() -> Path:
+    """Filesystem path of the current SQLite database."""
+    assert _engine is not None, "init_db() not called"
+    return Path(_engine.url.database or "")
+
+
+def close() -> str:
+    """Close every pooled connection (before swapping the database file). Returns the URL so
+    the caller can `init_db(url)` afterwards."""
+    assert _engine is not None, "init_db() not called"
+    _engine.dispose()
+    return _engine.url.render_as_string(hide_password=False)
 
 
 def get_session() -> Iterator[Session]:

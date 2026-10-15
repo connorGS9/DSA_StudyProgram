@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { api, type ImportStatus, type Settings, type Source } from '../api'
+import BackupCard from '../components/BackupCard'
 import GoogleCalendarCard from '../components/GoogleCalendar'
 import { ErrorBox, fmtDate, Loading, PageHeader, SourceBadge, useCategories } from '../components/ui'
 
@@ -24,6 +25,7 @@ export default function SettingsPage() {
       <PageHeader title="Settings" subtitle="Changes save automatically and apply to the next problems picked." />
       <ErrorBox error={save.error} />
       <GoogleCalendarCard />
+      <BackupCard />
       <Imports />
       <History settings={s} onSave={(c) => save.mutate(c)} />
       <Scheduling settings={s} onSave={(c) => save.mutate(c)} />

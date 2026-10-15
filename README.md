@@ -55,6 +55,10 @@ Settings → *Google Calendar* mirrors your Schedule into a dedicated "Study Lab
 
 It needs a one-time setup: your own free Google OAuth client. The Settings card walks you through it and shows the exact redirect URIs to register. The app only requests the `calendar.app.created` scope, so it can only see and change the calendar it creates. The client secret and sign-in token are stored in the local database in `data/`, which is never committed.
 
+### Backup and moving to another device
+
+Your data lives only in `data/`, which is never committed. Go to Settings → *Backup & restore* and click **Download backup** to get one zip with the database, your solutions and your videos. It's a consistent snapshot, so it's safe while the app is running. Sign-ins (the Google Calendar token and the LeetCode cookie) are left out unless you tick the box, so the zip is safe to email or put in cloud storage. On another device, clone the repo, run `./dsa`, and use **Restore** with that zip. Every restore first saves a safety copy of the current data to `data/backups/`, so you can undo it.
+
 ## Development
 
 ```bash

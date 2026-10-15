@@ -18,7 +18,7 @@ def main() -> None:
     url = f"http://{args.host}:{args.port}"
     if not args.no_browser:
         threading.Timer(1.2, lambda: webbrowser.open(url)).start()
-    print(f"DSA Trainer running at {url}  (Ctrl+C to stop)")
+    print(f"Study Lab running at {url}  (Ctrl+C to stop)")
     uvicorn.run("dsa.main:app", host=args.host, port=args.port, reload=args.reload, log_level="warning")
 
 
