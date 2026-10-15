@@ -195,3 +195,86 @@ class ImportRun(Base):
     added: Mapped[int] = mapped_column(Integer, default=0)
     updated: Mapped[int] = mapped_column(Integer, default=0)
     message: Mapped[str] = mapped_column(Text, default="")
+
+
+# --- Study lab: books and projects ------------------------------------------------------------
+
+class Book(Base):
+    __tablename__ = "books"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(256))
+    author: Mapped[str] = mapped_column(String(256), default="")
+    status: Mapped[str] = mapped_column(String(10), default="queued", index=True)  # queued | reading | finished | dropped
+    total_pages: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    current_page: Mapped[int] = mapped_column(Integer, default=0)
+    started_on: Mapped[str | None] = mapped_column(String(10), nullable=True)  # local date, ISO
+    finished_on: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    rating: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 1..5
+    url: Mapped[str] = mapped_column(String(512), default="")
+    position: Mapped[int] = mapped_column(Integer, default=0)  # order within the queue
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    notes: Mapped[list[BookNote]] = relationship(
+        back_populates="book", order_by="BookNote.created_at.desc()", cascade="all, delete-orphan"
+    )
+
+
+class BookNote(Base):
+    __tablename__ = "book_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    book_id: Mapped[int] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"), index=True)
+    page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    book: Mapped[Book] = relationship(back_populates="notes")
+
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(256))
+    description: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(8), default="active", index=True)  # idea | active | paused | done
+    link: Mapped[str] = mapped_column(String(512), default="")
+    started_on: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    finished_on: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    tasks: Mapped[list[ProjectTask]] = relationship(
+        back_populates="project", order_by="ProjectTask.position", cascade="all, delete-orphan"
+    )
+    notes: Mapped[list[ProjectNote]] = relationship(
+        back_populates="project", order_by="ProjectNote.created_at.desc()", cascade="all, delete-orphan"
+    )
+
+
+class ProjectTask(Base):
+    __tablename__ = "project_tasks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(512))
+    done: Mapped[bool] = mapped_column(Boolean, default=False)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    project: Mapped[Project] = relationship(back_populates="tasks")
+
+
+class ProjectNote(Base):
+    __tablename__ = "project_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    project: Mapped[Project] = relationship(back_populates="notes")

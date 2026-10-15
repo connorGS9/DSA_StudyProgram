@@ -225,3 +225,58 @@ export function qs(params: Record<string, string | number | boolean | null | und
   const s = p.toString()
   return s ? `?${s}` : ''
 }
+
+// --- Study lab ---------------------------------------------------------------------------------
+
+export interface LabNote {
+  id: number
+  body: string
+  created_at: string
+  page?: number | null
+}
+
+export type BookStatus = 'queued' | 'reading' | 'finished' | 'dropped'
+
+export interface Book {
+  id: number
+  title: string
+  author: string
+  status: BookStatus
+  total_pages: number | null
+  current_page: number
+  percent: number | null
+  started_on: string | null
+  finished_on: string | null
+  rating: number | null
+  url: string
+  position: number
+  updated_at: string
+  notes: LabNote[]
+}
+
+export type ProjectStatus = 'idea' | 'active' | 'paused' | 'done'
+
+export interface ProjectTask {
+  id: number
+  title: string
+  done: boolean
+  done_at: string | null
+}
+
+export interface Project {
+  id: number
+  name: string
+  description: string
+  status: ProjectStatus
+  link: string
+  started_on: string | null
+  finished_on: string | null
+  position: number
+  updated_at: string
+  tasks_done: number
+  tasks_total: number
+  percent: number | null
+  next_task: string | null
+  tasks: ProjectTask[]
+  notes: LabNote[]
+}

@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 
 from . import config
-from .api import admin, problems, stats, today
+from .api import admin, lab, problems, stats, today
 from .db import init_db, session_scope
 from .models import Problem
 
@@ -30,8 +30,8 @@ def create_app(db_url: str | None = None, auto_import: bool = True) -> FastAPI:
             _auto_import()
         yield
 
-    app = FastAPI(title="DSA Trainer", lifespan=lifespan)
-    for r in (today.router, problems.router, stats.router, admin.router):
+    app = FastAPI(title="Study Lab", lifespan=lifespan)
+    for r in (today.router, problems.router, stats.router, admin.router, lab.router):
         app.include_router(r)
 
     dist = config.FRONTEND_DIST

@@ -275,7 +275,7 @@ function SolveForm({ slot, slotId, onDone }: { slot: Slot; slotId: string; onDon
             Still needed: {[!outcome && 'how it went', !hasCode && 'solution code', !insight.trim() && 'key insight'].filter(Boolean).join(', ')}
           </span>
         )}
-        <Link to="/" className="btn btn-ghost ml-auto">
+        <Link to="/dsa" className="btn btn-ghost ml-auto">
           Back to today
         </Link>
       </div>
@@ -351,7 +351,7 @@ function RevealView({ result }: { result: { attempt: Attempt; reveal: Reveal; pr
       </div>
 
       <div className="flex gap-2">
-        <Link to="/" className="btn btn-primary">
+        <Link to="/dsa" className="btn btn-primary">
           Back to today
         </Link>
         <Link to={`/problems/${problem.id}`} className="btn">

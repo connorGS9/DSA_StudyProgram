@@ -1,6 +1,8 @@
-# DSA Trainer
+# Study Lab
 
-A local spaced-repetition trainer for data structures & algorithms practice. Each day it hands you a small set of problems from **Codeforces, CSES and LeetCode** without telling you their type. It balances categories, aims slightly above your current level, and brings problems back for review on an FSRS schedule.
+A local, all-in-one study lab: a DSA trainer plus your reading list and projects.
+
+The DSA trainer is a spaced-repetition trainer for data structures & algorithms practice. Each day it hands you a small set of problems from **Codeforces, CSES and LeetCode** without telling you their type. It balances categories, aims slightly above your current level, and brings problems back for review on an FSRS schedule.
 
 ## Run it
 
@@ -32,11 +34,14 @@ All of this is tunable in **Settings**.
 
 | Page | What it's for |
 |---|---|
-| Today | daily set, rerolls, streak, quick stats |
+| Lab | home dashboard: today's DSA set, books in progress (update your page inline), active projects with their next task |
+| Today | daily DSA set, rerolls, streak, quick stats |
 | Progress | skill per category, activity heatmap, review forecast, pattern-recognition accuracy |
 | Library | search/filter all problems, add any problem to today, exclude or retire problems |
 | Cheat Sheet | 28 topic sheets (DP has 14 sub-sections) with Java templates, signals, pitfalls and classic problems; edit them in `content/cheatsheet/*.md` |
 | Videos | all your recorded explanations |
+| Books | currently reading (page progress), an "up next" queue you drag to reorder, finished books with ratings, dated notes per book |
+| Projects | idea / active / paused / done projects, a task checklist that drives % complete (drag to reorder, double-click to rename), and a running log |
 | Settings | imports, Codeforces handle (auto-verifies AC), LeetCode history import, scheduling knobs, category emphasis |
 
 ### Importing LeetCode history
