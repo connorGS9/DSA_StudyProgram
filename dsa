@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Start DSA Trainer: sets up the Python venv and builds the UI on first run, then opens the browser.
+set -euo pipefail
+cd "$(dirname "$(readlink -f "$0")")"
+
+if [ ! -x .venv/bin/python ]; then
+  echo "Setting up Python environment..."
+  python3 -m venv .venv
+  .venv/bin/pip install -q -e .
+fi
+
+# Rebuild the UI when any frontend source is newer than the last build.
+if [ ! -f frontend/dist/index.html ] || [ -n "$(find frontend/src frontend/index.html -newer frontend/dist/index.html -print -quit)" ]; then
+  echo "Building UI..."
+  (cd frontend && { [ -d node_modules ] || npm install --silent; } && npm run build --silent >/dev/null)
+fi
+
+exec .venv/bin/python -m dsa "$@"

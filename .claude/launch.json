@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "dsa", "runtimeExecutable": "./dsa", "runtimeArgs": ["--no-browser"], "port": 8765 }
+  ]
+}
